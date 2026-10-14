@@ -68,6 +68,9 @@ textarea,input{font:600 17px var(--body);padding:12px;border-radius:12px;border:
 textarea{min-height:70px;resize:vertical}
 .entry{border-left:5px solid var(--gold);padding-left:12px}
 .stars{color:var(--gold);font-size:22px;letter-spacing:4px}
+#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:20}
+@media (prefers-reduced-motion:no-preference){.q-opts button.pop{animation:pop .5s ease}}
+@keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.08)}65%{transform:scale(.97)}100%{transform:scale(1)}}
 .fig{margin:0;display:flex;flex-direction:column;gap:6px}
 .fig button{padding:0;border:2px solid var(--line);border-radius:14px;background:#fff;cursor:zoom-in;overflow:hidden;display:block;width:100%}
 .fig img{display:block;width:100%;height:auto}
@@ -198,6 +201,7 @@ textarea{min-height:70px;resize:vertical}
   </section>
 </div>
 
+<canvas id="confetti" aria-hidden="true"></canvas>
 <div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Picture">
   <div class="bar"><button type="button" id="lbZoom">Zoom in</button><button type="button" id="lbClose">Close</button></div>
   <div class="scroll"><img id="lbImg" alt=""></div>
@@ -277,6 +281,13 @@ document.getElementById('missionList').innerHTML=missions.map((m,i)=>
 
 /* Quiz */
 const Q=[
+ ["In a girls' gymnastics competition, how many different events are there?",["2","4","6","10"],1,"Four! Vault, uneven bars, balance beam, and floor exercise. Boys' gymnastics has six events."],
+ ["Which of these is NOT one of the four girls' events?",["Balance beam","Vault","Trampoline","Floor exercise"],2,"Trampoline is its own sport. The four events are vault, uneven bars, beam, and floor."],
+ ["About how wide is the top of a competition balance beam?",["As wide as a hand, about 4 inches","As wide as a sidewalk","As wide as a door"],0,"Only about 4 inches (10 cm) wide! That's why balance practice on the floor comes first."],
+ ["What do gymnasts put on their hands to help them grip the bars?",["Lotion","Chalk","Glitter"],1,"Chalk soaks up sweat so hands don't slip on the bars."],
+ ["What makes the uneven bars \"uneven\"?",["One bar is higher than the other","One bar is wobbly","The bars are different colors"],0,"There's a high bar and a low bar, and gymnasts swing and move between them."],
+ ["Which event is performed to music in girls' gymnastics?",["Vault","Uneven bars","Floor exercise"],2,"The floor routine has music, so gymnasts can show off dance moves and personality."],
+ ["What do gymnasts do to the judges before and after a routine?",["Wave goodbye","Salute with an arm raised","Bow down to the floor"],1,"A salute with an arm up tells the judges \"I'm ready\" and \"I'm finished.\""],
  ["What should you always do before training?",["Eat a big snack","Warm up","Try your hardest trick first"],1,"Warming up gets your muscles ready and helps keep you safe."],
  ["A stretch starts to really hurt. What should you do?",["Push through it","Stop and ease off","Hold it longer"],1,"Never force a painful stretch. Gentle is the way to get more flexible."],
  ["Who should be there when you practice a back handspring?",["A qualified coach","Your best friend","Nobody, you can do it alone"],0,"Handsprings and flips need a coach, mats, and spotting."],
@@ -287,12 +298,32 @@ const Q=[
  ["What makes a routine look beautiful?",["Pointed toes and tall posture","Going as fast as possible","Floppy arms"],0,"Pointed toes, straight legs, tall posture, and graceful arms make moves shine."],
  ["Do you have to learn a new trick in four weeks to succeed?",["Yes","No"],1,"Nope! Getting smoother, stronger, and more confident counts as success."],
  ["How many parts should your creativity routine have?",["1","3 to 5","20"],1,"Three to five parts: opening pose, cartwheel, balance, dance step, and finish."]];
+const cv=document.getElementById('confetti'),cx=cv.getContext('2d');let bits=[],raf=0;
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function confetti(el){
+  const r=el.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;cx.setTransform(dpr,0,0,dpr,0,0);
+  const ox=r.left+r.width/2,oy=r.top+r.height/2,cols=['#2457c5','#e0a21b','#0f7f8f','#e2609f','#5cc98a','#7ea8ff'];
+  const n=reduce?0:90;
+  for(let k=0;k<n;k++){const a=Math.random()*Math.PI*2,s=4+Math.random()*7;
+    bits.push({x:ox,y:oy,vx:Math.cos(a)*s,vy:Math.sin(a)*s-6,w:6+Math.random()*6,h:4+Math.random()*4,
+      rot:Math.random()*6,vr:(Math.random()-.5)*.4,c:cols[k%cols.length],life:70+Math.random()*30,star:k%7===0})}
+  if(!raf&&n)raf=requestAnimationFrame(tick)}
+function star(x,y,r){cx.beginPath();for(let k=0;k<10;k++){const rr=k%2?r/2.3:r,a=k*Math.PI/5-Math.PI/2;cx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}cx.closePath();cx.fill()}
+function tick(){cx.clearRect(0,0,innerWidth,innerHeight);
+  bits=bits.filter(p=>p.life>0);
+  bits.forEach(p=>{p.vy+=.25;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr;p.life--;
+    cx.save();cx.globalAlpha=Math.min(1,p.life/25);cx.fillStyle=p.c;cx.translate(p.x,p.y);cx.rotate(p.rot);
+    if(p.star)star(0,0,p.w);else cx.fillRect(-p.w/2,-p.h/2,p.w,p.h);cx.restore()});
+  if(bits.length)raf=requestAnimationFrame(tick);else{raf=0;cx.clearRect(0,0,innerWidth,innerHeight)}}
 let qi=0,score=0;const qb=document.getElementById('quizBox');
 function drawQ(){
  if(qi>=Q.length){const best=Math.max(score,store.get('best',0));store.set('best',best);
   const stars=Math.round(score/Q.length*5);
   qb.innerHTML='<h3>You got '+score+' out of '+Q.length+'!</h3><div class="stars" aria-label="'+stars+' of 5 stars">'+'★'.repeat(stars)+'☆'.repeat(5-stars)+'</div><p class="note" style="margin:0">Best score: '+best+'</p><button class="big" type="button" id="again">Play again</button>';
-  document.getElementById('again').onclick=()=>{qi=0;score=0;drawQ()};return}
+  document.getElementById('again').onclick=()=>{qi=0;score=0;drawQ()};
+  if(score>=Q.length*0.6){confetti(qb);setTimeout(()=>confetti(qb),400)}
+  return}
  const [q,opts,ans,why]=Q[qi];
  qb.innerHTML='<span class="label">Question '+(qi+1)+' of '+Q.length+'</span><h3>'+q+'</h3><div class="q-opts">'+
   opts.map((o,i)=>'<button type="button" data-i="'+i+'">'+o+'</button>').join('')+'</div><p id="why" class="note" style="margin:0"></p>';
@@ -300,7 +331,9 @@ function drawQ(){
   if(qb.dataset.done)return;qb.dataset.done=1;const i=+b.dataset.i;
   if(i===ans)score++;
   qb.querySelectorAll('[data-i]').forEach(x=>{if(+x.dataset.i===ans)x.classList.add('right');else if(x===b)x.classList.add('wrong')});
-  document.getElementById('why').innerHTML='<b>'+(i===ans?'Nailed it! ':'Not quite. ')+'</b>'+why;
+  if(i===ans){b.classList.add('pop');confetti(b)}
+  const cheers=['Nailed it!','Stuck the landing!','Perfect 10!','Gold medal answer!','Yes! Way to go!','Super star!'];
+  document.getElementById('why').innerHTML='<b>'+(i===ans?cheers[Math.floor(Math.random()*cheers.length)]+' ':'Not quite. ')+'</b>'+why;
   const n=document.createElement('button');n.className='big';n.type='button';n.textContent=qi===Q.length-1?'See my score':'Next question';
   n.onclick=()=>{delete qb.dataset.done;qi++;drawQ()};qb.appendChild(n)})}
 drawQ();
